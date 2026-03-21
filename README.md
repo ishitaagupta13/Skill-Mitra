@@ -141,8 +141,6 @@ These testing methods ensure that the platform is reliable, secure, and function
 
 👩‍💻 Authors
 
-Ishika
-
 Ishita
 
 Ishitaa Gupta

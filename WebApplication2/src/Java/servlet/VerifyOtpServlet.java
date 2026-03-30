@@ -218,7 +218,8 @@ ps.executeUpdate();
             return;
         }
 
-    } catch (Exception e) {
+    }catch (Exception e) {
+    e.printStackTrace();
 
         e.printStackTrace();
 

@@ -188,16 +188,8 @@ setTimeout(function(){
         ${dobError}
     </span>
 </div>
-    <!-- Gender -->
-<!-- Gender -->
-<div class="form-group">
-    <label>Gender *</label>
-    <select name="jgender" required>
-        <option value="">Select</option>
-        <option value="Male" ${param.jgender=="Male"?"selected":""}>Male</option>
-        <option value="Female" ${param.jgender=="Female"?"selected":""}>Female</option>
-    </select>
-</div>
+    
+
     <!-- Skill -->
     <div class="form-group">
         <label>Skill *</label>

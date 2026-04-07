@@ -5,12 +5,12 @@
 <%@ page import="db.DBConnection" %>
 
 <%
-/* 🔒 Prevent browser caching */
+/* Prevent browser caching */
 response.setHeader("Cache-Control","no-cache, no-store, must-revalidate");
 response.setHeader("Pragma","no-cache");
 response.setDateHeader("Expires",0);
 
-/* 🔒 SESSION CHECK */
+/* SESSION CHECK */
 HttpSession currentSession = request.getSession(false);
 
 if(currentSession == null || currentSession.getAttribute("jobseekerId") == null){
@@ -125,6 +125,27 @@ try {
 } catch(Exception e){
     out.println("ERROR: " + e);
 }
+
+/* ── RATING WIDGET DATA (jobseeker profile — rated by employers) ── */
+double jsAvgRating  = 0;
+int    jsTotalRating = 0;
+try {
+    Connection conRat = DBConnection.getConnection();
+    PreparedStatement psRat = conRat.prepareStatement(
+        "SELECT ROUND(AVG(rating_value),1) AS avg_r, COUNT(*) AS total " +
+        "FROM ratings WHERE jobseeker_id=? AND rating_by='Employer'"
+    );
+    psRat.setInt(1, jid);
+    ResultSet rsRat = psRat.executeQuery();
+    if (rsRat.next()) {
+        jsAvgRating   = rsRat.getDouble("avg_r");
+        jsTotalRating = rsRat.getInt("total");
+    }
+    rsRat.close(); psRat.close();
+    conRat.close();
+} catch (Exception e) {
+    // silently ignore — don't break profile page if ratings table missing
+}
 %>
 
 <!DOCTYPE html>
@@ -192,6 +213,7 @@ input,select{
     padding:10px;
     border:1px solid #ccc;
     border-radius:6px;
+    box-sizing:border-box;
 }
 
 .dropdown-subskills{ position:relative; }
@@ -212,16 +234,78 @@ input,select{
     background:white;
     border:1px solid #ccc;
     border-radius:6px;
-    max-height:200px;
+    max-height:220px;
     overflow-y:auto;
     width:100%;
     z-index:10;
     padding:10px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.1);
 }
 
 .dropdown-content label{
     display:block;
     margin-bottom:5px;
+    cursor:pointer;
+}
+
+/* ── OK button inside dropdown ── */
+.dropdown-ok-wrap{
+    text-align:right;
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px solid #eee;
+    position:sticky;
+    bottom:0;
+    background:white;
+}
+
+.dropdown-ok-btn{
+    background:#4a6fa5;
+    color:white;
+    padding:5px 18px;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
+    font-size:13px;
+}
+
+.dropdown-ok-btn:hover{
+    background:#3a5f95;
+}
+
+/* ── RATING WIDGET ── */
+.rating-widget {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 12px;
+    padding: 10px 18px;
+    margin-top: 14px;
+    margin-bottom: 6px;
+}
+
+.rating-widget .stars {
+    font-size: 22px;
+    line-height: 1;
+    letter-spacing: 2px;
+}
+
+.rating-widget .star-filled  { color: #f59e0b; }
+.rating-widget .star-half    { color: #f59e0b; opacity: .55; }
+.rating-widget .star-empty   { color: #d1d5db; }
+
+.rating-widget .rat-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: #92400e;
+}
+
+.rating-widget .rat-meta {
+    font-size: 13px;
+    color: #9ca3af;
+    margin-left: 4px;
 }
 </style>
 </head>
@@ -251,6 +335,39 @@ input,select{
 
     <h2 style="text-align:center">Jobseeker Profile</h2>
 
+    <%-- ── RATING WIDGET (view mode only) ──────────────────────────────── --%>
+    <div style="text-align:center; margin-bottom:16px;">
+        <div class="rating-widget">
+            <div class="stars">
+<%
+if (jsTotalRating > 0) {
+    for (int i = 1; i <= 5; i++) {
+        if (i <= Math.floor(jsAvgRating)) {
+            out.print("<span class='star-filled'>★</span>");
+        } else if ((i - jsAvgRating) > 0 && (i - jsAvgRating) < 1) {
+            out.print("<span class='star-half'>★</span>");
+        } else {
+            out.print("<span class='star-empty'>★</span>");
+        }
+    }
+} else {
+    out.print("<span class='star-empty'>★★★★★</span>");
+}
+%>
+            </div>
+            <div>
+<% if (jsTotalRating > 0) { %>
+                <span class="rat-val"><%= jsAvgRating %></span>
+                <span style="font-size:13px;color:#78716c;">/5</span>
+                <span class="rat-meta">(<%= jsTotalRating %> review<%= jsTotalRating != 1 ? "s" : "" %>)</span>
+<% } else { %>
+                <span class="rat-meta">No reviews yet</span>
+<% } %>
+            </div>
+        </div>
+    </div>
+    <%-- ── END RATING WIDGET ──────────────────────────────────────────── --%>
+
     <div class="row"><span class="label">Name:</span> <%=fname%> <%=lname%></div>
     <div class="row"><span class="label">Email:</span> <%=email%></div>
     <div class="row"><span class="label">Phone:</span> <%=phone%></div>
@@ -268,7 +385,8 @@ input,select{
     </div>
 
     <hr>
-        <div class="row">
+
+    <div class="row">
         <span class="label">Skill:</span>
 
         <%
@@ -324,9 +442,9 @@ input,select{
 
         con3.close();
         %>
-
-        <hr>
     </div>
+
+    <hr>
 
     <div class="row"><span class="label">District:</span> <%=district%></div>
     <div class="row"><span class="label">Area:</span> <%=area%></div>
@@ -436,12 +554,13 @@ input,select{
             <div>
                 <label>Subskills</label>
 
-                <div class="dropdown-subskills">
+                <div class="dropdown-subskills" id="subskill-wrapper">
 
                     <button type="button"
                             onclick="toggleSubskills()"
-                            class="dropdown-btn">
-                        Select Subskills
+                            class="dropdown-btn"
+                            id="subskill-toggle-btn">
+                        Select Subskills ▾
                     </button>
 
                     <div id="subskill-container" class="dropdown-content">
@@ -474,6 +593,15 @@ input,select{
                         }
                         con2.close();
                         %>
+
+                        <!-- ✅ FIX: OK button to close dropdown (server-rendered subskills) -->
+                        <div class="dropdown-ok-wrap">
+                            <button type="button"
+                                    class="dropdown-ok-btn"
+                                    onclick="closeSubskills()">
+                                OK
+                            </button>
+                        </div>
 
                     </div>
                 </div>
@@ -533,7 +661,7 @@ input,select{
         <br>
 
         <button class="btn">Update</button>
-        <a href="jobseeker_profile.jsp" class="btn">Cancel</a>
+        <a href="jobseeker_profile.jsp" class="btn" style="margin-left:10px;">Cancel</a>
 
     </form>
 </div>
@@ -543,39 +671,74 @@ input,select{
 <!-- JS -->
 <script>
 
+/* ── Toggle open/close ── */
+function toggleSubskills(){
+    const box = document.getElementById("subskill-container");
+    box.style.display = (box.style.display === "block") ? "none" : "block";
+}
+
+/* ── Close only (used by OK button) ── */
+function closeSubskills(){
+    document.getElementById("subskill-container").style.display = "none";
+
+    /* Update button label to show count of selected */
+    const checked = document.querySelectorAll("#subskill-container input[type='checkbox']:checked");
+    const btn = document.getElementById("subskill-toggle-btn");
+    if(checked.length > 0){
+        btn.textContent = checked.length + " subskill(s) selected ▾";
+    } else {
+        btn.textContent = "Select Subskills ▾";
+    }
+}
+
+/* ── Load subskills dynamically when skill changes ── */
 function loadSubskills(){
     const skillId = document.querySelector("select[name='skill']").value;
     const box = document.getElementById("subskill-container");
 
-    box.innerHTML = "Loading...";
+    box.innerHTML = "<p style='padding:6px;color:#888;font-size:13px;'>Loading...</p>";
+    box.style.display = "block";
 
     fetch("<%=request.getContextPath()%>/GetSubskillsServlet?skillId=" + skillId)
         .then(res => res.json())
         .then(data => {
             box.innerHTML = "";
 
-            data.forEach(s => {
-                const label = document.createElement("label");
-                label.style.display = "block";
+            if(data.length === 0){
+                box.innerHTML = "<p style='padding:6px;color:#888;font-size:13px;'>No subskills found.</p>";
+            } else {
+                data.forEach(s => {
+                    const label = document.createElement("label");
+                    label.style.display = "block";
+                    label.style.marginBottom = "5px";
+                    label.style.cursor = "pointer";
+                    label.innerHTML =
+                        '<input type="checkbox" name="subskills" value="' + s.id + '"> ' + s.name;
+                    box.appendChild(label);
+                });
+            }
 
-                label.innerHTML =
-                    '<input type="checkbox" name="subskills" value="' + s.id + '"> ' + s.name;
-
-                box.appendChild(label);
-            });
+            /* ✅ FIX: Re-add OK button after dynamic load */
+            const okWrap = document.createElement("div");
+            okWrap.className = "dropdown-ok-wrap";
+            okWrap.innerHTML =
+                '<button type="button" class="dropdown-ok-btn" onclick="closeSubskills()">OK</button>';
+            box.appendChild(okWrap);
+        })
+        .catch(err => {
+            box.innerHTML = "<p style='padding:6px;color:red;font-size:13px;'>Error loading subskills.</p>";
         });
 }
 
-function toggleSubskills(){
-    const box = document.getElementById("subskill-container");
-
-    if(box.style.display === "block"){
-        box.style.display = "none";
-    } else {
-        box.style.display = "block";
+/* ── FIX: Close dropdown when clicking outside ── */
+document.addEventListener("click", function(e){
+    const wrapper = document.getElementById("subskill-wrapper");
+    if(wrapper && !wrapper.contains(e.target)){
+        document.getElementById("subskill-container").style.display = "none";
     }
-}
+});
 
+/* ── ZIP / Pincode auto-fill ── */
 function fetchLocation(){
     let pincode = document.getElementById("zip").value;
 
@@ -589,15 +752,15 @@ function fetchLocation(){
                     let po = data[0].PostOffice;
 
                     document.getElementById("district").value = po[0].District;
-                    document.getElementById("state").value = po[0].State;
-                    document.getElementById("country").value = po[0].Country;
+                    document.getElementById("state").value    = po[0].State;
+                    document.getElementById("country").value  = po[0].Country;
 
                     let areaSelect = document.getElementById("area");
                     areaSelect.innerHTML = "";
 
                     po.forEach(p => {
                         let opt = document.createElement("option");
-                        opt.value = p.Name;
+                        opt.value       = p.Name;
                         opt.textContent = p.Name;
                         areaSelect.appendChild(opt);
                     });
@@ -605,7 +768,6 @@ function fetchLocation(){
                 } else {
                     alert("Invalid Pincode");
                 }
-
             });
     }
 }
